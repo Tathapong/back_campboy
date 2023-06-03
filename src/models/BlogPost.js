@@ -9,18 +9,17 @@ module.exports = (sequelize, DataTypes) => {
           notEmpty: true
         }
       },
-      contentText: {
-        type: DataTypes.STRING(5000),
+      content: {
+        type: DataTypes.TEXT("medium"),
         allowNull: false,
         validate: {
           notEmpty: true
         }
       },
-      image: {
+      featureImage: {
         type: DataTypes.STRING(255),
         validate: {
-          notEmpty: true,
-          isUrl: true
+          notEmpty: true
         }
       }
     },

@@ -1,11 +1,11 @@
 const cloudinary = require("../config/cloudinary");
 
-exports.uploadImage = async (imagePath, folderPath, publicId) => {
+exports.uploadImage = async (file_path, folder_path, publicId) => {
   const options = {
-    folder: folderPath,
     use_filename: true,
     unique_filename: false,
-    overwrite: true
+    overwrite: true,
+    folder: folder_path
   };
 
   if (publicId) {
@@ -13,10 +13,10 @@ exports.uploadImage = async (imagePath, folderPath, publicId) => {
   }
 
   try {
-    const result = await cloudinary.uploader.upload(imagePath, options);
+    const result = await cloudinary.uploader.upload(file_path, options);
     return result.secure_url;
-  } catch (err) {
-    console.log(err);
+  } catch (error) {
+    console.log(error);
   }
 };
 

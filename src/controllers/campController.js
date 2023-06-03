@@ -4,7 +4,7 @@ const { Op } = require("sequelize");
 const AppError = require("../utilities/appError");
 const campService = require("../services/campService");
 const constant = require("../config/constant");
-const { isEachNumber, isEachInRange, isNumericString, isInRange } = require("../validation/validation");
+const { isEachNumber, isEachInRange } = require("../validation/validation");
 
 async function getAllId(model) {
   try {

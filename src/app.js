@@ -3,12 +3,12 @@ require("dotenv").config();
 const infomationRoute = require("./routes/informationRoute");
 const campRoute = require("./routes/campRoute");
 const authRoute = require("./routes/authRoute");
+const blogRoute = require("./routes/blogRoute");
 const errorMiddleware = require("./middlewares/errorMiddleware");
 const notFoundMiddleware = require("./middlewares/notFoundMiddleware");
-const { sequelize, ReviewPost, Camp } = require("./models/index");
+const { sequelize, BlogPost } = require("./models/index");
 
-// ReviewPost.sync({ alter: true });
-// Camp.sync({ alter: true });
+// BlogPost.sync({ alter: true });
 
 const express = require("express");
 const cors = require("cors");
@@ -22,6 +22,7 @@ app.use(express.json());
 app.use("/api/resources", infomationRoute);
 app.use("/camp", campRoute);
 app.use("/auth", authRoute);
+app.use("/blog", blogRoute);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
