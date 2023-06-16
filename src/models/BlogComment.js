@@ -3,7 +3,7 @@ module.exports = (sequelize, DataTypes) => {
     "BlogComment",
     {
       contentText: {
-        type: DataTypes.STRING(5000),
+        type: DataTypes.STRING(2000),
         allowNull: false,
         validate: {
           notEmpty: true

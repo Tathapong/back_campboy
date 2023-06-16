@@ -19,3 +19,5 @@ exports.isInRange = (str, rangeList) => {
   if (typeof str === "string") return rangeList.includes(+str);
   else return true;
 };
+
+exports.isNotEmpty = (input) => input && input.trim();

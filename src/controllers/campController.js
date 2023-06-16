@@ -4,29 +4,20 @@ const { Op } = require("sequelize");
 const AppError = require("../utilities/appError");
 const campService = require("../services/campService");
 const constant = require("../config/constant");
-const { isEachNumber, isEachInRange } = require("../validation/validation");
-
-async function getAllId(model) {
-  try {
-    const idList = await model.findAll({ attributes: ["id"] });
-    return idList.map((item) => item.id);
-  } catch (error) {
-    throw error;
-  }
-}
-///+ Validate function
-const isNotEmpty = (input) => input && input.trim();
+const { isEachNumber, isEachInRange, isNotEmpty } = require("../validation/validation");
+const { getAllId } = require("../utilities/getAllModelId");
 
 ///+                                                                                                                              +
 exports.getCampById = async (req, res, next) => {
   try {
     const params = req.params;
     const campId = +params.campId;
+
     const campAllIdList = await getAllId(db.Camp);
 
     //+ Validation
-    if (isNaN(campId)) throw new AppError("campId must be numeric", 400);
-    if (!campAllIdList.includes(campId)) throw new AppError("campId was out of range", 400);
+    if (isNaN(campId)) throw new AppError("CampId must be numeric", 400);
+    if (!campAllIdList.includes(campId)) throw new AppError("CampId not found", 400);
 
     const camp = await db.Camp.findOne({
       where: { id: campId },
