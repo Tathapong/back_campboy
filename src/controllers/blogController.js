@@ -214,6 +214,7 @@ exports.getAllBlog = async (req, res, next) => {
     next(error);
   }
 };
+
 exports.getBlogById = async (req, res, next) => {
   try {
     const params = req.params;

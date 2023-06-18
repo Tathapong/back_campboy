@@ -5,6 +5,7 @@ const authRoute = require("./routes/authRoute");
 const blogRoute = require("./routes/blogRoute");
 const campRoute = require("./routes/campRoute");
 const commentRoute = require("./routes/commentRoute");
+const profileRoute = require("./routes/profileRoute");
 const errorMiddleware = require("./middlewares/errorMiddleware");
 const notFoundMiddleware = require("./middlewares/notFoundMiddleware");
 const { sequelize, BlogComment } = require("./models/index");
@@ -23,6 +24,7 @@ app.use("/camp", campRoute);
 app.use("/auth", authRoute);
 app.use("/blog", blogRoute);
 app.use("/comment", commentRoute);
+app.use("/profile", profileRoute);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
