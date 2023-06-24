@@ -1,15 +1,10 @@
 const cloudinary = require("../utilities/cloudinary");
 const { isNotEmpty } = require("../validation/validation");
 
-const axios = require("axios");
-const fs = require("fs");
 const db = require("../models/index");
 const AppError = require("../utilities/appError");
+const deleteCacheImage = require("../utilities/deleteCacheImage");
 const { getAllId } = require("../utilities/getAllModelId");
-
-function deleteCacheImage(imageFile) {
-  if (imageFile) fs.unlinkSync(imageFile.path);
-}
 
 async function deleteCloudinaryImage(rawContentState) {
   try {
@@ -54,7 +49,7 @@ exports.uploadBlogImage = async (req, res, next) => {
     next(error);
   } finally {
     const imageFile = req.file;
-    deleteCacheImage(imageFile);
+    deleteCacheImage([imageFile]);
   }
 };
 

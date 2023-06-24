@@ -16,7 +16,10 @@ module.exports = async function (req, res, next) {
 
     // Decode for payload
     const payload = jwt.verify(token, process.env.JWT_SECRET_KEY || "private_key");
-    const user = await db.User.findOne({ where: { id: payload.id }, attributes: { exclude: "password" } });
+    const user = await db.User.findOne({
+      where: { id: payload.id },
+      attributes: { exclude: ["password", "email", "createdAt", "updatedAt"] }
+    });
 
     // In case of no have the user
     if (!user) throw new AppError("unauthenticated", 401);

@@ -2,8 +2,8 @@ const validator = require("validator");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+
 const db = require("../models/index");
-const { Op } = require("sequelize");
 const { sendEmail, htmlSignupVerify, htmlResetPassword } = require("../utilities/sendEmail");
 
 const constant = require("../config/constant");
@@ -55,10 +55,8 @@ exports.signup = async (req, res, next) => {
       lastName,
       password: hashedPassword,
       email,
-      profileImage:
-        "https://res.cloudinary.com/duzw1g3u8/image/upload/v1679762595/Campboy/assets/default_profile_t1umfj.png",
-      coverImage:
-        "https://res.cloudinary.com/duzw1g3u8/image/upload/v1679762598/Campboy/assets/default_cover_xtsa1d.jpg"
+      profileImage: process.env.CLOUDINARY_DEFAULT_PROFILE_IMAGE,
+      coverImage: process.env.CLOUDINARY_DEFAULT_COVER_IMAGE
     });
 
     //+ Create token in UserToken for verification

@@ -9,13 +9,13 @@ module.exports = (sequelize, DataTypes) => {
 
   FollowUser.associate = (db) => {
     FollowUser.belongsTo(db.User, {
-      as: "user",
-      foreignKey: { name: "userId", allowNull: false },
+      as: "following",
+      foreignKey: { name: "accountId", allowNull: false },
       onDelete: "RESTRICT",
       onUpdate: "RESTRICT"
     });
     FollowUser.belongsTo(db.User, {
-      as: "following",
+      as: "follower",
       foreignKey: { name: "followingId", allowNull: false },
       onDelete: "RESTRICT",
       onUpdate: "RESTRICT"

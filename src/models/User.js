@@ -71,14 +71,15 @@ module.exports = (sequelize, DataTypes) => {
       onDelete: "RESTRICT",
       onUpdate: "RESTRICT"
     });
+
     User.hasMany(db.FollowUser, {
-      as: "user",
-      foreignKey: { name: "userId", allowNull: false },
+      as: "following",
+      foreignKey: { name: "accountId", allowNull: false },
       onDelete: "RESTRICT",
       onUpdate: "RESTRICT"
     });
     User.hasMany(db.FollowUser, {
-      as: "following",
+      as: "follower",
       foreignKey: { name: "followingId", allowNull: false },
       onDelete: "RESTRICT",
       onUpdate: "RESTRICT"

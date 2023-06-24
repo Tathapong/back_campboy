@@ -8,10 +8,13 @@ const commentRoute = require("./routes/commentRoute");
 const profileRoute = require("./routes/profileRoute");
 const errorMiddleware = require("./middlewares/errorMiddleware");
 const notFoundMiddleware = require("./middlewares/notFoundMiddleware");
-const { sequelize, BlogComment } = require("./models/index");
+const { sequelize, FollowUser, User } = require("./models/index");
 
 const express = require("express");
 const cors = require("cors");
+
+// User.sync({ alter: true });
+// FollowUser.sync({ alter: true });
 
 const app = express();
 
