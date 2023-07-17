@@ -13,18 +13,20 @@ module.exports = (sequelize, DataTypes) => {
         }
       },
       propertyType: {
-        type: DataTypes.ENUM(PROPERTY_TYPE_TENT, PROPERTY_TYPE_GLAMPING, PROPERTY_TYPE_RVCAR, PROPERTY_TYPE_HOMESTAY),
+        type: DataTypes.STRING(255),
         allowNull: false,
         defaultValue: PROPERTY_TYPE_TENT
       },
       phone: {
         type: DataTypes.STRING(255),
+        allowNull: false,
         validate: {
           notEmpty: true
         }
       },
       email: {
         type: DataTypes.STRING(255),
+        allowNull: false,
         validate: {
           isEmail: true,
           notEmpty: true

@@ -1,20 +1,21 @@
-const cloudinary = require("../utilities/cloudinary");
-const { isNotEmpty } = require("../validation/validation");
-
+const { Op } = require("sequelize");
 const db = require("../models/index");
+
 const AppError = require("../utilities/appError");
 const deleteCacheImage = require("../utilities/deleteCacheImage");
-const { getAllId } = require("../utilities/getAllModelId");
+const getAllAttribute = require("../utilities/getAllAttributes");
+const { uploadImage, getPublicId, deleteResource } = require("../utilities/cloudinary");
+const { isNotEmpty } = require("../validation/validation");
 
 async function deleteCloudinaryImage(rawContentState) {
   try {
     const entityMap = rawContentState.entityMap;
     for (let key in entityMap) {
       if (entityMap[key].data.public_id) {
-        const public_id = `${process.env.CLOUDINARY_BLOG_FOLDER.slice(1)}/${cloudinary.getPublicId(
+        const public_id = `${process.env.CLOUDINARY_BLOG_FOLDER.slice(1)}/${getPublicId(
           entityMap[key].data.public_id
         )}`;
-        await cloudinary.deleteResource(public_id);
+        await deleteResource(public_id);
       }
     }
   } catch (error) {
@@ -22,6 +23,168 @@ async function deleteCloudinaryImage(rawContentState) {
   }
 }
 
+///+ Get all blog
+exports.getAllBlog = async (req, res, next) => {
+  try {
+    const userClassify = req.user;
+
+    const attributesOption = [];
+    if (userClassify)
+      attributesOption.push(
+        [
+          db.sequelize.literal(
+            `(select count(id) from blog_likes where user_id = ${userClassify.id} and blog_id=BlogPost.id)`
+          ),
+          "isLike"
+        ],
+        [
+          db.sequelize.literal(
+            `(select count(id) from blog_saves where user_id = ${userClassify.id} and blog_id=BlogPost.id)`
+          ),
+          "isSave"
+        ]
+      );
+
+    const blogs = await db.BlogPost.findAll({
+      attributes: [
+        "id",
+        "title",
+        "content",
+        "featureImage",
+        "createdAt",
+        ["user_id", "profileId"],
+        [
+          db.sequelize.literal("(select concat(first_name,' ',last_name) from users where id = BlogPost.user_id)"),
+          "profileName"
+        ],
+        [db.sequelize.literal("(select profile_image from users where id = BlogPost.user_id)"), "profileImage"],
+        [db.sequelize.literal("(select count(id) from blog_likes where blog_id = BlogPost.id)"), "blogLikeCount"],
+        [
+          db.sequelize.literal(
+            "(select count(blog_comments.id) from blog_comments where blog_comments.blog_id = BlogPost.id)"
+          ),
+          "blogCommentCount"
+        ],
+        ...attributesOption
+      ]
+    });
+
+    return res.status(200).json({ blogs });
+  } catch (error) {
+    next(error);
+  }
+};
+
+///+ Get blog by Id
+exports.getBlogById = async (req, res, next) => {
+  try {
+    const params = req.params;
+    const blogId = params.blogId;
+
+    const userClassify = req.user;
+
+    const blogAllIdList = await getAllAttribute(db.BlogPost, "id");
+
+    //+Validation
+    //- BlogID
+
+    if (blogId && isNaN(blogId)) throw new AppError("BlogId must be numeric", 404);
+    if (!blogAllIdList.includes(+blogId)) throw new AppError("BlogId not found", 404);
+
+    const attributesOption = [];
+    const includeOption = [];
+
+    if (userClassify) {
+      attributesOption.push(
+        [
+          db.sequelize.literal(
+            `(select count(id) from blog_likes where user_id = ${userClassify.id} and blog_id=BlogPost.id)`
+          ),
+          "isLike"
+        ],
+        [
+          db.sequelize.literal(
+            `(select count(id) from blog_saves where user_id = ${userClassify.id} and blog_id=BlogPost.id)`
+          ),
+          "isSave"
+        ]
+      );
+
+      includeOption.push([
+        db.sequelize.literal(
+          `(select count(id) from comment_likes where user_id = ${userClassify.id} and comment_id=BlogComments.id)`
+        ),
+        "isCommentLike"
+      ]);
+    }
+
+    const blog = await db.BlogPost.findOne({
+      where: { id: blogId },
+      attributes: [
+        "id",
+        "title",
+        "content",
+        "featureImage",
+        "createdAt",
+        ["user_id", "profileId"],
+        [
+          db.sequelize.literal("(select concat(first_name,' ',last_name) from users where id = BlogPost.user_id)"),
+          "profileName"
+        ],
+        [db.sequelize.literal("(select profile_image from users where id = BlogPost.user_id)"), "profileImage"],
+        [db.sequelize.literal("(select about from users where id = BlogPost.user_id)"), "profileAbout"],
+
+        [db.sequelize.literal("(select count(id) from blog_likes where blog_id = BlogPost.id)"), "blogLikeCount"],
+        [
+          db.sequelize.literal(
+            "(select count(blog_comments.id) from blog_comments where blog_comments.blog_id = BlogPost.id)"
+          ),
+          "blogCommentCount"
+        ],
+        ...attributesOption
+      ],
+      include: [
+        {
+          model: db.BlogComment,
+          attributes: [
+            "id",
+            "contentText",
+            "createdAt",
+            ["user_id", "profileId"],
+            [
+              db.sequelize.literal(
+                "(select concat(first_name,' ',last_name) from users where id = BlogComments.user_id)"
+              ),
+              "profileName"
+            ],
+            [db.sequelize.literal("(select profile_image from users where id = BlogComments.user_id)"), "profileImage"],
+            [
+              db.sequelize.literal("(select count(id) from comment_likes where comment_id=BlogComments.id)"),
+              "commentLikeCount"
+            ],
+            ...includeOption
+          ]
+        }
+      ],
+      order: [[db.sequelize.literal("BlogComments.created_at"), "DESC"]]
+    });
+
+    const profileId = JSON.parse(JSON.stringify(blog)).profileId;
+
+    const moreBlog = await db.BlogPost.findAll({
+      where: { id: { [Op.ne]: blogId }, userId: profileId },
+      attributes: ["id", "title", "featureImage", "createdAt"],
+      limit: 5,
+      order: [["createdAt", "DESC"]]
+    });
+
+    return res.status(200).json({ blog, moreBlog });
+  } catch (error) {
+    next(error);
+  }
+};
+
+///+ Upload blog image
 exports.uploadBlogImage = async (req, res, next) => {
   try {
     const imageBlog = req.file;
@@ -43,16 +206,17 @@ exports.uploadBlogImage = async (req, res, next) => {
     if (imageBlog) file = imageBlog.path;
     else if (url) file = url;
 
-    const public_id = await cloudinary.uploadImage(file, cloudinary_folder, undefined);
+    const public_id = await uploadImage(file, cloudinary_folder, undefined);
     return res.status(200).json({ public_id });
   } catch (error) {
     next(error);
   } finally {
     const imageFile = req.file;
-    deleteCacheImage([imageFile]);
+    if (imageFile) deleteCacheImage([imageFile]);
   }
 };
 
+///+ Create blog
 exports.createBlog = async (req, res, next) => {
   try {
     const { title, rawContentState, featureImage = null } = req.body;
@@ -64,10 +228,10 @@ exports.createBlog = async (req, res, next) => {
     if (!isNotEmpty(title)) throw new AppError("Title is required", 400);
 
     //- Raw Content State
-    if (!isNotEmpty(rawContent)) throw new AppError("RawContentState is required", 400);
+    if (!rawContentState) throw new AppError("RawContentState is required", 400);
 
     const rawContentRegEx = /(?=.*{"blocks":)(?=.*"entityMap")/;
-    if (!rawContentRegEx.test(rawContent.trim()))
+    if (!rawContentRegEx.test(rawContent))
       throw new AppError("Raw content state is not in json(content state) format", 400);
 
     //- Feature Image
@@ -88,6 +252,7 @@ exports.createBlog = async (req, res, next) => {
   }
 };
 
+///+ Update blog
 exports.updateBlog = async (req, res, next) => {
   try {
     const { title, rawContentState, featureImage = null } = req.body;
@@ -97,14 +262,18 @@ exports.updateBlog = async (req, res, next) => {
     const params = req.params;
     const blogId = +params.blogId;
 
-    const blogAllIdList = await getAllId(db.BlogPost);
+    const blogAllIdList = await getAllAttribute(db.BlogPost, "id");
 
     //+ Validation
+    //- BlogID
+    if (isNaN(blogId)) throw new AppError("BlogId must be numeric", 400);
+    if (!blogAllIdList.includes(blogId)) throw new AppError("BlogId not found", 400);
+
     //- Title
     if (!isNotEmpty(title)) throw new AppError("Title is required", 400);
 
     //- Raw Content State
-    if (!isNotEmpty(rawContent)) throw new AppError("RawContentState is required", 400);
+    if (!rawContentState) throw new AppError("RawContentState is required", 400);
 
     const rawContentRegEx = /(?=.*{"blocks":)(?=.*"entityMap")/;
     if (!rawContentRegEx.test(rawContent.trim()))
@@ -116,13 +285,9 @@ exports.updateBlog = async (req, res, next) => {
     if (featureImage && !urlRegEx.test(featureImage.trim()))
       throw new AppError("Feature image is not in url format", 400);
 
-    //- BlogID
-    if (isNaN(blogId)) throw new AppError("BlogId must be numeric", 400);
-    if (!blogAllIdList.includes(blogId)) throw new AppError("BlogId not found", 400);
-
     //- Authorized
     const blogPost = await db.BlogPost.findOne({ where: { id: blogId } });
-    if (blogPost.userId !== userId) throw new AppError("No authorize to delete other user's blog", 403);
+    if (blogPost.userId !== userId) throw new AppError("No authorize to update other user's blog", 403);
 
     await deleteCloudinaryImage(JSON.parse(blogPost.content));
     await blogPost.update({ title, content: rawContent, featureImage });
@@ -133,6 +298,7 @@ exports.updateBlog = async (req, res, next) => {
   }
 };
 
+///+ Delete blog
 exports.deleteBlog = async (req, res, next) => {
   try {
     const params = req.params;
@@ -140,7 +306,7 @@ exports.deleteBlog = async (req, res, next) => {
 
     const { id: userId } = req.user;
 
-    const blogAllIdList = await getAllId(db.BlogPost);
+    const blogAllIdList = await getAllAttribute(db.BlogPost, "id");
 
     //+Validation
     //- BlogID
@@ -169,98 +335,6 @@ exports.deleteBlog = async (req, res, next) => {
     await blogPost.destroy();
 
     return res.status(204).json();
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.getAllBlog = async (req, res, next) => {
-  try {
-    const userClassify = req.user;
-    const includeOption = [
-      {
-        model: db.User,
-        attributes: { exclude: ["createdAt", "updatedAt", "verify", "coverImage", "password", "email", "id", "about"] }
-      },
-      {
-        model: db.BlogLike,
-        attributes: { exclude: ["createdAt", "updatedAt", "blogId"] }
-      },
-      {
-        model: db.BlogComment,
-        attributes: ["id"]
-      }
-    ];
-
-    if (userClassify)
-      includeOption.push({
-        model: db.BlogSave,
-        where: { userId: userClassify.id },
-        attributes: { exclude: ["createdAt", "updatedAt", "blogId"] },
-        separate: true
-      });
-
-    const blogs = await db.BlogPost.findAll({
-      attributes: { exclude: ["updatedAt"] },
-      include: includeOption
-    });
-    return res.status(200).json({ blogs });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.getBlogById = async (req, res, next) => {
-  try {
-    const params = req.params;
-    const blogId = +params.blogId;
-
-    const userClassify = req.user;
-
-    const blogAllIdList = await getAllId(db.BlogPost);
-
-    //+Validation
-    //- BlogID
-    if (isNaN(blogId)) throw new AppError("BlogId must be numeric", 400);
-    if (!blogAllIdList.includes(blogId)) throw new AppError("BlogId was out of range", 400);
-
-    const includeOption = [
-      {
-        model: db.User,
-        attributes: { exclude: ["createdAt", "updatedAt", "verify", "coverImage", "password", "email", "id"] }
-      },
-      {
-        model: db.BlogLike,
-        attributes: { exclude: ["createdAt", "updatedAt", "blogId"] }
-      },
-      {
-        model: db.BlogComment,
-        include: [
-          { model: db.CommentLike, attributes: { exclude: ["commentId", "createdAt", "updatedAt"] } },
-          {
-            model: db.User,
-            attributes: { exclude: ["email", "password", "coverImage", "about", "verify", "createdAt", "updatedAt"] }
-          }
-        ],
-        attributes: { exclude: ["updatedAt", "blogId"] }
-      }
-    ];
-
-    if (userClassify)
-      includeOption.push({
-        model: db.BlogSave,
-        where: userClassify ? { userId: userClassify.id } : {},
-        attributes: { exclude: ["createdAt", "updatedAt", "blogId"] },
-        separate: true
-      });
-
-    const blog = await db.BlogPost.findOne({
-      where: { id: blogId },
-      attributes: { exclude: ["featureImage", "updatedAt"] },
-      include: includeOption,
-      order: [[db.BlogComment, "createdAt", "DESC"]]
-    });
-    return res.status(200).json({ blog });
   } catch (error) {
     next(error);
   }

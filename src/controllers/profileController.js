@@ -1,102 +1,92 @@
 const AppError = require("../utilities/appError");
 const db = require("../models/index");
+
 const deleteCacheImage = require("../utilities/deleteCacheImage");
-const cloudinary = require("../utilities/cloudinary");
-const { getAllId } = require("../utilities/getAllModelId");
+const getAllAttributes = require("../utilities/getAllAttributes");
+const { getPublicId, uploadImage } = require("../utilities/cloudinary");
 const { isNotEmpty } = require("../validation/validation");
 
-function getPublicId(url, folderPath) {
+function getOldPublicId(url) {
   const defaultProfileImageURL = process.env.CLOUDINARY_DEFAULT_PROFILE_IMAGE;
   const defaultCoverImageURL = process.env.CLOUDINARY_DEFAULT_COVER_IMAGE;
 
-  let fileName;
-
-  if (url !== defaultProfileImageURL && url !== defaultCoverImageURL) {
-    fileName = cloudinary.getPublicId(url);
-    if (folderPath) return `${folderPath}/${fileName}`;
-    else return fileName;
-  } else return null;
+  if (url !== defaultProfileImageURL && url !== defaultCoverImageURL) return getPublicId(url);
+  else return null;
 }
 
+///+ Get profile by Id
 exports.getProfileById = async (req, res, next) => {
   try {
     const params = req.params;
     const profileId = +params.profileId;
-    const userClassify = req.user;
 
-    const profileAllIdList = await getAllId(db.User);
+    const profileAllIdList = await getAllAttributes(db.User, "id");
 
     //+Validation
     //- Profile Id
-    if (isNaN(profileId)) throw new AppError("ProfileId must be numeric", 400);
+    if (isNaN(profileId)) throw new AppError("ProfileId must be numeric", 404);
     if (!profileAllIdList.includes(profileId)) throw new AppError("ProfileId not found", 404);
-
-    const includeOption = [
-      {
-        model: db.BlogPost,
-        attributes: { exclude: ["updatedAt", "userId"] },
-        include: [
-          {
-            model: db.BlogLike,
-            attributes: ["id", "userId"]
-          },
-          {
-            model: db.BlogComment,
-            attributes: ["id", "userId"]
-          }
-        ]
-      },
-      {
-        model: db.FollowUser,
-        as: "follower",
-        attributes: ["id", "accountId"],
-        include: [
-          {
-            model: db.User,
-            as: "following",
-            attributes: ["firstName", "lastName", "profileImage"]
-          }
-        ]
-      },
-      {
-        model: db.FollowUser,
-        as: "following",
-        attributes: ["id", "followingId"],
-        include: [
-          {
-            model: db.User,
-            as: "follower",
-            attributes: ["firstName", "lastName", "profileImage"]
-          }
-        ]
-      }
-    ];
-
-    if (userClassify)
-      includeOption[0].include.push({
-        model: db.BlogSave,
-        where: { userId: userClassify.id },
-        attributes: ["id", "userId"],
-        separate: true
-      });
 
     const profile = await db.User.findOne({
       where: { id: profileId },
-      attributes: { exclude: ["password", "email", "verify", "createdAt", "updatedAt"] },
-      include: includeOption
+      attributes: ["id", "firstName", "lastName", "profileImage", "coverImage", "about"],
+      include: [
+        {
+          model: db.FollowUser,
+          as: "follower",
+          attributes: [
+            ["account_id", "profileId"],
+            [
+              db.sequelize.literal(
+                "(select concat(first_name,' ',last_name) from users where id=`follower.profileId`)"
+              ),
+              "profileName"
+            ],
+            [db.sequelize.literal("(select profile_image from users where id=`follower.profileId`)"), "profileImage"],
+            [db.sequelize.literal("(select about from users where id=`follower.profileId`)"), "profileAbout"],
+            [
+              db.sequelize.literal("(select count(id) from follow_users where following_id=`follower.profileId`)"),
+              "followerCount"
+            ]
+          ]
+        },
+        {
+          model: db.FollowUser,
+          as: "following",
+          attributes: [
+            ["following_id", "profileId"],
+            [
+              db.sequelize.literal(
+                "(select concat(first_name,' ',last_name) from users where id=`following.profileId`)"
+              ),
+              "profileName"
+            ],
+            [db.sequelize.literal("(select profile_image from users where id=`following.profileId`)"), "profileImage"],
+            [db.sequelize.literal("(select about from users where id=`following.profileId`)"), "profileAbout"],
+            [
+              db.sequelize.literal("(select count(id) from follow_users where following_id=`following.profileId`)"),
+              "followerCount"
+            ]
+          ]
+        }
+      ],
+      order: [
+        [db.sequelize.literal("`follower.followerCount`"), "DESC"],
+        [db.sequelize.literal("`following.followerCount`"), "DESC"]
+      ]
     });
+
     return res.status(200).json({ profile });
   } catch (error) {
-    console.log(error);
     next(error);
   }
 };
 
+///+ Update profile by Id
 exports.updateProfileById = async (req, res, next) => {
   try {
     const user = req.user;
-
-    const { profileImage, coverImage } = req.files;
+    const { profileImage, coverImage } = req.files ?? { profileImage: null, coverImage: null };
     const { firstName, lastName, about } = req.body;
 
     const cloudinary_profile_folder = process.env.CLOUDINARY_PROFILE_FOLDER;
@@ -127,22 +117,14 @@ exports.updateProfileById = async (req, res, next) => {
     else input.about = about;
 
     if (profileImage) {
-      const oldProfileImageID = getPublicId(profile.profileImage);
-      const newProfileImageID = await cloudinary.uploadImage(
-        profileImage[0].path,
-        cloudinary_profile_folder,
-        oldProfileImageID
-      );
+      const oldProfileImageID = getOldPublicId(profile.profileImage);
+      const newProfileImageID = await uploadImage(profileImage[0].path, cloudinary_profile_folder, oldProfileImageID);
       input.profileImage = newProfileImageID;
     }
 
     if (coverImage) {
-      const oldCoverImageID = getPublicId(profile.coverImage);
-      const newCoverImageID = await cloudinary.uploadImage(
-        coverImage[0].path,
-        cloudinary_cover_folder,
-        oldCoverImageID
-      );
+      const oldCoverImageID = getOldPublicId(profile.coverImage);
+      const newCoverImageID = await uploadImage(coverImage[0].path, cloudinary_cover_folder, oldCoverImageID);
       input.coverImage = newCoverImageID;
     }
 
@@ -152,12 +134,13 @@ exports.updateProfileById = async (req, res, next) => {
   } catch (error) {
     next(error);
   } finally {
-    const { profileImage, coverImage } = req.files;
+    const { profileImage, coverImage } = req.files ?? { profileImage: null, coverImage: null };
     if (profileImage) deleteCacheImage([profileImage[0]]);
     if (coverImage) deleteCacheImage([coverImage[0]]);
   }
 };
 
+///+ Toggle follow
 exports.toggleFollow = async (req, res, next) => {
   try {
     const params = req.params;
@@ -165,7 +148,7 @@ exports.toggleFollow = async (req, res, next) => {
 
     const user = req.user;
 
-    const profileAllIdList = await getAllId(db.User);
+    const profileAllIdList = await getAllAttributes(db.User, "id");
 
     //+Validation
     //- Profile Id
@@ -176,11 +159,20 @@ exports.toggleFollow = async (req, res, next) => {
       where: { accountId: user.id, followingId: profileId }
     });
 
-    if (created)
-      return res
-        .status(201)
-        .json({ follow: { id: follow.id, accountId: follow.accountId, followingId: follow.followingId } });
-    else {
+    if (created) {
+      const newFollower = await db.User.findOne({
+        where: { id: user.id },
+        attributes: [
+          ["id", "profileId"],
+          [db.sequelize.literal('concat(first_name," ",last_name)'), "profileName"],
+          "profileImage",
+          ["about", "profileAbout"],
+          [db.sequelize.literal("(select count(id) from follow_users where following_id=User.id)"), "followerCount"]
+        ]
+      });
+
+      return res.status(201).json({ follow: newFollower });
+    } else {
       await follow.destroy();
       return res.status(200).json({ follow: null });
     }
@@ -189,30 +181,22 @@ exports.toggleFollow = async (req, res, next) => {
   }
 };
 
-exports.getFollowingList = async (req, res, next) => {
+///+ Get accoung list top writer
+exports.getAccountListTopWriter = async (req, res, next) => {
   try {
-    const params = req.params;
-    const profileId = +params.profileId;
-
-    const profileAllIdList = await getAllId(db.User);
-
-    //+Validation
-    //- Profile Id
-    if (isNaN(profileId)) throw new AppError("ProfileId must be numeric", 400);
-    if (!profileAllIdList.includes(profileId)) throw new AppError("ProfileId not found", 400);
-
-    const followingList = await db.FollowUser.findAll({
-      where: { accountId: profileId },
-      attributes: { exclude: ["createdAt", "updatedAt"] },
-      include: [
-        {
-          model: db.User,
-          as: "follower",
-          attributes: ["id", "firstName", "lastName", "profileImage"]
-        }
-      ]
+    const followList = await db.User.findAll({
+      where: { verify: true },
+      limit: 50,
+      attributes: [
+        ["id", "profileId"],
+        [db.sequelize.literal("(select concat(first_name,' ',last_name) from users where id=User.id)"), "profileName"],
+        "profileImage",
+        ["about", "profileAbout"],
+        [db.sequelize.literal("(select count(id) from follow_users where following_id=User.id)"), "followerCount"]
+      ],
+      order: [["followerCount", "DESC"]]
     });
-    return res.status(200).json({ followingList });
+    return res.status(200).json({ followList });
   } catch (error) {
     next(error);
   }

@@ -17,7 +17,10 @@ module.exports = async (req, res, next) => {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET_KEY || "private_key");
-    const existUser = await db.User.findOne({ where: { id: payload.id }, attributes: { exclude: "password" } });
+    const existUser = await db.User.findOne({
+      where: { id: payload.id, verify: true },
+      attributes: { exclude: "password" }
+    });
 
     if (!existUser) {
       req.user = null;

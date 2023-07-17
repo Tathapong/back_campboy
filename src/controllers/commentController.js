@@ -1,8 +1,10 @@
-const { getAllId } = require("../utilities/getAllModelId");
-const { isNotEmpty } = require("../validation/validation");
-const AppError = require("../utilities/appError");
 const db = require("../models/index");
+const AppError = require("../utilities/appError");
 
+const getAllAttributes = require("../utilities/getAllAttributes");
+const { isNotEmpty } = require("../validation/validation");
+
+///+ Create comment
 exports.createComment = async (req, res, next) => {
   try {
     const params = req.params;
@@ -11,7 +13,7 @@ exports.createComment = async (req, res, next) => {
     const { id: userId } = req.user;
     const { title } = req.body;
 
-    const blogAllIdList = await getAllId(db.BlogPost);
+    const blogAllIdList = await getAllAttributes(db.BlogPost, "id");
 
     //+Validation
     //- BlogID
@@ -24,13 +26,26 @@ exports.createComment = async (req, res, next) => {
     const comment = await db.BlogComment.create({ userId, blogId, contentText: title });
     const result = await db.BlogComment.findOne({
       where: { id: comment.id },
-      attributes: { exclude: ["updatedAt", "blogId"] },
-      include: [
-        { model: db.CommentLike, attributes: { exclude: [] } },
-        {
-          model: db.User,
-          attributes: { exclude: ["email", "password", "coverImage", "about", "verify", "createdAt", "updatedAt"] }
-        }
+      attributes: [
+        "id",
+        "contentText",
+        "createdAt",
+        ["user_id", "profileId"],
+        [
+          db.sequelize.literal("(select concat(first_name,' ',last_name) from users where id = BlogComment.user_id)"),
+          "profileName"
+        ],
+        [db.sequelize.literal("(select profile_image from users where id = BlogComment.user_id)"), "profileImage"],
+        [
+          db.sequelize.literal("(select count(id) from comment_likes where comment_id=BlogComment.id)"),
+          "commentLikeCount"
+        ],
+        [
+          db.sequelize.literal(
+            `(select count(id) from comment_likes where user_id = ${userId} and comment_id=BlogComment.id)`
+          ),
+          "isCommentLike"
+        ]
       ]
     });
 
@@ -39,6 +54,8 @@ exports.createComment = async (req, res, next) => {
     next(error);
   }
 };
+
+///+ Update comment
 exports.updateComment = async (req, res, next) => {
   try {
     const params = req.params;
@@ -48,8 +65,8 @@ exports.updateComment = async (req, res, next) => {
     const { id: userId } = req.user;
     const { title } = req.body;
 
-    const blogAllIdList = await getAllId(db.BlogPost);
-    const commentAllIdList = await getAllId(db.BlogComment);
+    const blogAllIdList = await getAllAttributes(db.BlogPost, "id");
+    const commentAllIdList = await getAllAttributes(db.BlogComment, "id");
 
     //+Validation
     //- BlogID
@@ -65,7 +82,7 @@ exports.updateComment = async (req, res, next) => {
 
     //- Authorize of user
     const existComment = await db.BlogComment.findOne({ where: { id: commentId, blogId } });
-    if (existComment.userId !== userId) throw new AppError("No authorize to delete other user's comment", 403);
+    if (existComment.userId !== userId) throw new AppError("No authorize to update other user's comment", 403);
 
     await existComment.update({ contentText: title }, { where: { blogId, userId, id: commentId } });
     return res.status(200).json({ comment: title });
@@ -74,6 +91,7 @@ exports.updateComment = async (req, res, next) => {
   }
 };
 
+///+ Delete comment
 exports.deleteComment = async (req, res, next) => {
   try {
     const params = req.params;
@@ -82,8 +100,8 @@ exports.deleteComment = async (req, res, next) => {
 
     const { id: userId } = req.user;
 
-    const blogAllIdList = await getAllId(db.BlogPost);
-    const commentAllIdList = await getAllId(db.BlogComment);
+    const blogAllIdList = await getAllAttributes(db.BlogPost, "id");
+    const commentAllIdList = await getAllAttributes(db.BlogComment, "id");
 
     //+Validation
     //- BlogID
@@ -109,6 +127,7 @@ exports.deleteComment = async (req, res, next) => {
   }
 };
 
+///+ Toggle comment like
 exports.toggleCommentLike = async (req, res, next) => {
   try {
     const params = req.params;
@@ -116,7 +135,7 @@ exports.toggleCommentLike = async (req, res, next) => {
 
     const { id: userId } = req.user;
 
-    const commentAllIdList = await getAllId(db.BlogComment);
+    const commentAllIdList = await getAllAttributes(db.BlogComment, "id");
 
     //+Validation
     //- CommentID

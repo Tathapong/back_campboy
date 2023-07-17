@@ -20,6 +20,10 @@ module.exports = (sequelize, DataTypes) => {
       onDelete: "RESTRICT",
       onUpdate: "RESTRICT"
     });
+    FollowUser.hasMany(db.FollowUser, {
+      foreignKey: { name: "accountId" },
+      sourceKey: "followingId"
+    });
   };
 
   return FollowUser;

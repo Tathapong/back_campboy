@@ -1,20 +1,20 @@
 require("dotenv").config();
 
-const infomationRoute = require("./routes/informationRoute");
 const authRoute = require("./routes/authRoute");
 const blogRoute = require("./routes/blogRoute");
 const campRoute = require("./routes/campRoute");
 const commentRoute = require("./routes/commentRoute");
+const homeRoute = require("./routes/homeRoute");
+const infomationRoute = require("./routes/informationRoute");
 const profileRoute = require("./routes/profileRoute");
+const joincampRoute = require("./routes/joincampRoute");
+
 const errorMiddleware = require("./middlewares/errorMiddleware");
-const notFoundMiddleware = require("./middlewares/notFoundMiddleware");
-const { sequelize, FollowUser, User } = require("./models/index");
+
+// const { sequelize, JoinCamp } = require("./models/index");
 
 const express = require("express");
 const cors = require("cors");
-
-// User.sync({ alter: true });
-// FollowUser.sync({ alter: true });
 
 const app = express();
 
@@ -23,13 +23,15 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 app.use("/api/resources", infomationRoute);
-app.use("/camp", campRoute);
+
 app.use("/auth", authRoute);
 app.use("/blog", blogRoute);
+app.use("/camp", campRoute);
 app.use("/comment", commentRoute);
+app.use("/home", homeRoute);
 app.use("/profile", profileRoute);
+app.use("/joincamp", joincampRoute);
 
-app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
 const port = process.env.PORT || 8008;

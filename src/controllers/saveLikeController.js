@@ -1,7 +1,8 @@
 const db = require("../models/index");
 const AppError = require("../utilities/appError");
-const { getAllId } = require("../utilities/getAllModelId");
+const getAllAttributes = require("../utilities/getAllAttributes");
 
+///+ Toggle save blog
 exports.toggleSave = async (req, res, next) => {
   try {
     const params = req.params;
@@ -9,7 +10,7 @@ exports.toggleSave = async (req, res, next) => {
 
     const { id: userId } = req.user;
 
-    const blogAllIdList = await getAllId(db.BlogPost);
+    const blogAllIdList = await getAllAttributes(db.BlogPost, "id");
 
     //+Validation
     //- BlogID
@@ -28,6 +29,7 @@ exports.toggleSave = async (req, res, next) => {
   }
 };
 
+///+ Toggle like blog
 exports.toggleLike = async (req, res, next) => {
   try {
     const params = req.params;
@@ -35,7 +37,7 @@ exports.toggleLike = async (req, res, next) => {
 
     const { id: userId } = req.user;
 
-    const blogAllIdList = await getAllId(db.BlogPost);
+    const blogAllIdList = await getAllAttributes(db.BlogPost, "id");
 
     //+Validation
     //- BlogID

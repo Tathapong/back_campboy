@@ -1,6 +1,7 @@
 const db = require("../models/index");
-const constant = require("../config/constant");
+const { SERVICE, ACTIVITY } = require("../config/constant");
 
+///+ Get provinces
 exports.getProvinces = async (req, res, next) => {
   try {
     const provinces = await db.Province.findAll({ attributes: ["id", "name", ["id", "value"]] });
@@ -10,6 +11,7 @@ exports.getProvinces = async (req, res, next) => {
   }
 };
 
+///+ Get filter checkbox
 exports.getFliterCheckbox = async (req, res, next) => {
   try {
     const informationItems = await db.InformationItem.findAll({
@@ -19,8 +21,8 @@ exports.getFliterCheckbox = async (req, res, next) => {
       attributes: { exclude: ["createdAt", "updatedAt"] }
     });
 
-    const services = informationItems.filter((item) => item.type === constant.SERVICE);
-    const activities = informationItems.filter((item) => item.type === constant.ACTIVITY);
+    const services = informationItems.filter((item) => item.type === SERVICE);
+    const activities = informationItems.filter((item) => item.type === ACTIVITY);
 
     const rating = [
       { id: 1, title: 1 },
@@ -38,6 +40,16 @@ exports.getFliterCheckbox = async (req, res, next) => {
         rating
       }
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+///+ Get properties
+exports.getProperties = async (req, res, next) => {
+  try {
+    const properties = await db.PropertyType.findAll({ attributes: ["id", ["title", "label"], ["title", "value"]] });
+    return res.status(200).json({ properties });
   } catch (error) {
     next(error);
   }

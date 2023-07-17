@@ -5,7 +5,8 @@ exports.uploadImage = async (file_path, folder_path, publicId) => {
     const options = {
       use_filename: false,
       unique_filename: false,
-      overwrite: true
+      overwrite: true,
+      format: "jpg"
     };
     if (folder_path) {
       options.folder = folder_path;
@@ -29,7 +30,6 @@ exports.getPublicId = (url, folderPath) => {
   else return fileName;
 };
 
-exports.resources = (options) => cloudinary.api.resources(options);
 exports.deleteResource = async (publicId) => {
   return await cloudinary.api.delete_resources(publicId);
 };

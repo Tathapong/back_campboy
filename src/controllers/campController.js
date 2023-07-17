@@ -1,65 +1,93 @@
-const db = require("../models/index");
 const { Op } = require("sequelize");
 
-const AppError = require("../utilities/appError");
+const db = require("../models/index");
 const campService = require("../services/campService");
-const constant = require("../config/constant");
+const AppError = require("../utilities/appError");
+const getAllAttributes = require("../utilities/getAllAttributes");
 const { isEachNumber, isEachInRange, isNotEmpty } = require("../validation/validation");
-const { getAllId } = require("../utilities/getAllModelId");
 
-///+                                                                                                                              +
+///+ Get camp by Id
 exports.getCampById = async (req, res, next) => {
   try {
     const params = req.params;
     const campId = +params.campId;
 
-    const campAllIdList = await getAllId(db.Camp);
+    const campAllIdList = await getAllAttributes(db.Camp, "id");
 
     //+ Validation
-    if (isNaN(campId)) throw new AppError("CampId must be numeric", 400);
-    if (!campAllIdList.includes(campId)) throw new AppError("CampId not found", 400);
+    if (isNaN(campId)) throw new AppError("CampId must be numeric", 404);
+    if (!campAllIdList.includes(campId)) throw new AppError("CampId not found", 404);
 
     const camp = await db.Camp.findOne({
       where: { id: campId },
-      attributes: { exclude: ["createdAt", "updatedAt", "provinceId"] },
+      attributes: [
+        "id",
+        "name",
+        "locationLat",
+        "locationLng",
+        "overview",
+        [db.sequelize.literal("(select id from provinces where id=Camp.province_id)"), "provinceId"],
+        [db.sequelize.literal("(select name from provinces where id=Camp.province_id)"), "provinceName"],
+        [db.sequelize.literal("(select round(avg(rating)) from review_posts where camp_id=Camp.id )"), "scores"]
+      ],
+
       include: [
-        { model: db.CampImage, attributes: { exclude: ["createdAt", "updatedAt", "campId"] } },
-        { model: db.Province, attributes: { exclude: ["createdAt", "updatedAt"] } },
-        { model: db.CampContact, attributes: { exclude: ["createdAt", "updatedAt", "campId"] } },
+        { model: db.CampImage, attributes: ["id", ["image", "src"]] },
+        { model: db.CampContact, attributes: ["id", "type", "contact"] },
         {
           model: db.CampInformation,
-          include: { model: db.InformationItem, attributes: { exclude: ["createdAt", "updatedAt"] } },
-          attributes: {
-            exclude: ["createdAt", "updatedAt", "campId", "informationItemId"]
-          }
-        },
-        {
-          model: db.CampProperty,
-          include: { model: db.PropertyType, attributes: { exclude: ["createdAt", "updatedAt"] } },
-          attributes: { exclude: ["createdAt", "updatedAt", "campId", "propertyTypeId"] }
+          attributes: [
+            "id",
+            "subTitle1",
+            "subTitle2",
+            [
+              db.sequelize.literal(
+                "(select type from information_items where id=CampInformations.information_item_id)"
+              ),
+              "type"
+            ],
+            [
+              db.sequelize.literal(
+                "(select title from information_items where id=CampInformations.information_item_id)"
+              ),
+              "title"
+            ],
+            [
+              db.sequelize.literal(
+                "(select icon_image from information_items where id=CampInformations.information_item_id)"
+              ),
+              "iconImage"
+            ]
+          ]
         },
         {
           model: db.ReviewPost,
           as: "ReviewPosts",
+          attributes: [
+            "id",
+            "summarize",
+            "reviewText",
+            "rating",
+            "createdAt",
+            ["user_id", "profileId"],
+            [
+              db.sequelize.literal("concat(`ReviewPosts->User`.first_name,' ',`ReviewPosts->User`.last_name)"),
+              "profileName"
+            ],
+            [db.sequelize.literal("`ReviewPosts->User`.profile_image"), "profileImage"]
+          ],
           include: {
             model: db.User,
-            attributes: {
-              exclude: ["createdAt", "updatedAt", "email", "mobile", "password", "coverImage", "about", "verify"]
-            }
-          },
-          attributes: {
-            exclude: ["updatedAt", "campId", "userId"]
-          },
-          order: [[db.ReviewPost, "createdAt", "DESC"]]
+            attributes: []
+          }
         },
         {
           model: db.ReviewPost,
           as: "OverallRating",
-          attributes: [[db.sequelize.fn("round", db.sequelize.fn("avg", db.sequelize.col("rating"))), "rating"]],
-          group: "campId",
-          separate: true
+          attributes: []
         }
-      ]
+      ],
+      order: [[db.sequelize.literal("ReviewPosts.created_at"), "DESC"]]
     });
 
     if (!camp) throw new AppError("Internal server error", 500);
@@ -70,99 +98,102 @@ exports.getCampById = async (req, res, next) => {
   }
 };
 
-///+                                                                                                                              +
+///+ Filter all camp
 exports.filterAllCamp = async (req, res, next) => {
   try {
     const { destination, province, rating, property, informationItem } = req.query;
 
     //+ Get range of data
-    const provinceAllIdList = await getAllId(db.Province);
-    const propertyAllIdList = await getAllId(db.PropertyType);
-    const infoAllIdList = await getAllId(db.InformationItem);
+    const provinceAllIdList = await getAllAttributes(db.Province, "id");
+    const propertyAllIdList = await getAllAttributes(db.PropertyType, "id");
+    const infoAllIdList = await getAllAttributes(db.InformationItem, "id");
 
     //+Validation
     //- Destination
-    if (destination && typeof destination !== "string") throw new AppError("destination must be string", 400);
+    if (destination && typeof destination !== "string") throw new AppError("Destination must be string", 400);
 
     //- Province
-    if (province && (isNaN(+province) || typeof +province !== "number"))
-      throw new AppError("province must be numeric", 400);
-    if (province && !provinceAllIdList.includes(+province)) throw new AppError("province must be in range", 400);
+    if (province) {
+      if (isNaN(+province) || typeof province === "object") throw new AppError("Province must be numeric", 400);
+      if (!provinceAllIdList.includes(+province)) throw new AppError("Province not found", 400);
+    }
 
     //- Rating
-    if (rating && !Array.isArray(rating)) throw new AppError("Rating must be array");
-    if (!isEachNumber(rating)) throw new AppError("each of value must be numeric");
-    if (!isEachInRange(rating, [1, 2, 3, 4, 5])) throw new AppError("each of value must be in range", 400);
+    if (rating) {
+      if (!Array.isArray(rating)) throw new AppError("Rating must be array");
+      if (!isEachNumber(rating)) throw new AppError("Each of value must be numeric");
+      if (!isEachInRange(rating, [1, 2, 3, 4, 5])) throw new AppError("Each of value must be in range", 400);
+    }
 
     //- Property
-    if (property && !Array.isArray(property)) throw new AppError("Property must be array", 400);
-    if (!isEachNumber(property)) throw new AppError("each of value must be numeric");
-    if (!isEachInRange(property, propertyAllIdList)) throw new AppError("each of value must be in range", 400);
+    if (property) {
+      if (!Array.isArray(property)) throw new AppError("Property must be array", 400);
+      if (!isEachNumber(property)) throw new AppError("Each of value must be numeric");
+      if (!isEachInRange(property, propertyAllIdList)) throw new AppError("Each of value must be in range", 400);
+    }
 
     //- InformationItem
-    if (informationItem && !Array.isArray(informationItem)) throw new AppError("Information item must be array", 400);
-    if (!isEachNumber(informationItem)) throw new AppError("each of value must be numeric");
-    if (!isEachInRange(informationItem, infoAllIdList)) throw new AppError("each of value must be in range", 400);
+    if (informationItem) {
+      if (!Array.isArray(informationItem)) throw new AppError("Information item must be array", 400);
+      if (!isEachNumber(informationItem)) throw new AppError("Each of value must be numeric");
+      if (!isEachInRange(informationItem, infoAllIdList)) throw new AppError("Each of value must be in range", 400);
+    }
 
-    //+ Where
-    const destinationWhere = destination ? { name: { [Op.substring]: destination } } : {};
-    const provinceWhere = province ? { province_id: +province } : {};
+    const campIdByDestination = await db.sequelize
+      .query(destination ? `select id from camps where name like '%${destination}%'` : "select id from camps", {
+        type: db.sequelize.QueryTypes.SELECT
+      })
+      .then((res) => res.map((item) => item.id));
 
-    const propertyWhere = property ? campService.createFilterWhere(property, "property_type_id") : {};
-    const informationItemWhere = informationItem
-      ? campService.createFilterWhere(informationItem, "information_item_id")
-      : {};
+    const campIdByProvince = await db.sequelize
+      .query(province ? `select id from camps where province_id=${province}` : "select id from camps", {
+        type: db.sequelize.QueryTypes.SELECT
+      })
+      .then((res) => res.map((item) => item.id));
 
-    //+ Group
-    const propertyGroup = property ? "camp_id" : "";
-    const informationItemGroup = informationItem ? "camp_id" : "";
-    const ratingGroup = rating ? "camp_id" : "";
+    const campIdByProperty = await db.sequelize
+      .query(
+        property
+          ? `select camp_id id from camp_properties where property_type_id in (${property.join(
+              ","
+            )}) group by camp_id having count(camp_id)=${property.length}`
+          : "select id from camps",
+        {
+          type: db.sequelize.QueryTypes.SELECT
+        }
+      )
+      .then((res) => res.map((item) => item.id));
 
-    //+ Having
-    const informationItemHaving = informationItem
-      ? campService.createFilterHaving(informationItem, "information_item_id")
-      : {};
-    const ratingHaving = rating
-      ? db.sequelize.where(db.sequelize.fn("round", db.sequelize.fn("avg", db.sequelize.col("rating"))), {
-          [Op.in]: rating
-        })
-      : {};
+    const campIdByRating = await db.sequelize
+      .query(
+        rating
+          ? `select camp_id id from review_posts group by camp_id having round(avg(rating)) in (${rating.join(",")})`
+          : `select id from camps`,
+        {
+          type: db.sequelize.QueryTypes.SELECT
+        }
+      )
+      .then((res) => res.map((item) => item.id));
 
-    //+ CampId by
-    const campByProvinceDest = await campService.convertToIdList({
-      model: db.Camp,
-      where: [provinceWhere, destinationWhere],
-      columnName: "id"
-    });
-    const campByProperty = await campService.convertToIdList({
-      model: db.CampProperty,
-      where: propertyWhere,
-      group: propertyGroup,
-      columnName: "campId"
-    });
-    const campByRating =
-      rating?.length || rating !== undefined
-        ? await campService.convertToIdList({
-            model: db.ReviewPost,
-            group: ratingGroup,
-            having: ratingHaving,
-            columnName: "campId"
-          })
-        : await campService.convertToIdList({ model: db.Camp, columnName: "id" });
-
-    const campByInformationItem = await campService.convertToIdList({
-      model: db.CampInformation,
-      where: informationItemWhere,
-      columnName: "campId",
-      group: informationItemGroup,
-      having: informationItemHaving
-    });
+    const campIdByInformation = await db.sequelize
+      .query(
+        informationItem
+          ? `select camp_id id from camp_informations where information_item_id in (${informationItem.join(
+              ","
+            )}) group by camp_id having count(camp_id)=${informationItem.length}`
+          : "select id from camps",
+        {
+          type: db.sequelize.QueryTypes.SELECT
+        }
+      )
+      .then((res) => res.map((item) => item.id));
 
     req.campFilterList = campService.findMatchId(
-      campByProvinceDest,
-      campByProperty,
-      campByRating,
-      campByInformationItem
+      campIdByDestination,
+      campIdByProvince,
+      campIdByProperty,
+      campIdByRating,
+      campIdByInformation
     );
     next();
   } catch (error) {
@@ -170,60 +201,68 @@ exports.filterAllCamp = async (req, res, next) => {
   }
 };
 
-///+                                                                                                                              +
+///+ Get all camp
 exports.getAllCamp = async (req, res, next) => {
   try {
     const { campFilterList } = req;
-    const campsWhere = campService.createFilterWhere(campFilterList, "id");
-
     const camps = await db.Camp.findAll({
-      where: campsWhere,
-      attributes: { exclude: ["updatedAt", "provinceId", "overview"] },
+      where: { id: { [Op.in]: campFilterList } },
+      attributes: [
+        "id",
+        "name",
+        "locationLat",
+        "locationLng",
+        "createdAt",
+        [db.sequelize.literal("(select image from camp_images where camp_id=Camp.id and type='COVER')"), "coverImage"],
+        [db.sequelize.literal("(select name from provinces where Camp.province_id = id )"), "provinceName"],
+        [db.sequelize.literal("(select round(avg(rating)) from review_posts where camp_id=Camp.id )"), "scores"],
+        [db.sequelize.literal("(select count(id) from review_posts where camp_id=Camp.id)"), "reviewCount"]
+      ],
       include: [
         {
-          model: db.CampImage,
-          attributes: { exclude: ["createdAt", "updatedAt", "campId"] },
-          where: { type: constant.COVER }
-        },
-        { model: db.Province, attributes: { exclude: ["createdAt", "updatedAt"] } },
-        {
           model: db.CampInformation,
-          include: {
-            model: db.InformationItem,
-            where: { [Op.or]: [{ id: 16 }, { id: 17 }, { id: 11 }, { id: 12 }] }, // Service charge, Limit people, check-in, check-out
-            attributes: { exclude: ["createdAt", "updatedAt"] }
-          },
-          attributes: {
-            exclude: ["createdAt", "updatedAt", "campId"]
-          }
-        },
-        {
-          model: db.ReviewPost,
-          as: "OverallRating",
+          where: { information_item_id: [16, 17, 11, 12] },
           attributes: [
-            [db.sequelize.fn("round", db.sequelize.fn("avg", db.sequelize.col("rating"))), "rating"],
-            [db.sequelize.fn("count", db.sequelize.col("rating")), "count"]
-          ],
-          group: "campId",
-          separate: true
+            "id",
+            "subTitle1",
+            [
+              db.sequelize.literal(
+                "(select title from information_items where id=CampInformations.information_item_id)"
+              ),
+              "title"
+            ],
+            [
+              db.sequelize.literal(
+                "(select icon_image from information_items where id=CampInformations.information_item_id)"
+              ),
+              "iconImage"
+            ]
+          ]
         }
-      ]
+      ],
+      order: [[db.sequelize.literal("Camp.id"), "ASC"]]
     });
-    return res.status(200).json({ camps: camps });
+    return res.status(200).json({ camps });
   } catch (error) {
     next(error);
   }
 };
 
-///+                                                                                                                              +
+///+ Write review
 exports.writeReview = async (req, res, next) => {
   try {
     const user = req.user;
     const { rating, summarize, reviewText, campId } = req.body;
 
+    const campAllIdList = await getAllAttributes(db.Camp, "id");
+
     //+Validation
+
+    //- CampId
+    if (isNaN(campId)) throw new AppError("CampId must be numeric", 400);
+    if (!campAllIdList.includes(+campId)) throw new AppError("CampId not found", 400);
+
     //- Rating
-    if (!rating) throw new AppError("Rating is required", 400);
     if (rating && (isNaN(+rating) || typeof +rating !== "number")) throw new AppError("Rating must be numeric", 400);
     if (![1, 2, 3, 4, 5].includes(+rating)) throw new AppError("Rating must be in range");
 
@@ -234,7 +273,90 @@ exports.writeReview = async (req, res, next) => {
     if (!isNotEmpty(reviewText)) throw new AppError("Review text is required", 400);
 
     const reviewPost = await db.ReviewPost.create({ summarize, reviewText, rating, campId, userId: user.id });
-    return res.status(201).json({ reviewPost: reviewPost });
+    const result = await db.ReviewPost.findOne({
+      where: { id: reviewPost.id },
+      attributes: [
+        "id",
+        "summarize",
+        "reviewText",
+        "rating",
+        "createdAt",
+        ["user_id", "profileId"],
+        [
+          db.sequelize.literal("(select concat(first_name,' ',last_name) from users where id=ReviewPost.user_id)"),
+          "profileName"
+        ],
+        [db.sequelize.literal("(select profile_image from users where id=ReviewPost.user_id)"), "profileImage"]
+      ]
+    });
+    return res.status(201).json({ reviewPost: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+///+ Update review
+exports.updateReview = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const { reviewId } = req.params;
+    const { rating, summarize, reviewText } = req.body;
+
+    const reviewAllIdList = await getAllAttributes(db.ReviewPost, "id");
+
+    //+Validation
+
+    //- ReviewId
+    if (isNaN(reviewId)) throw new AppError("ReviewId must be numeric", 400);
+    if (!reviewAllIdList.includes(+reviewId)) throw new AppError("ReviewId not found", 400);
+
+    //- Rating
+    if (isNaN(rating)) throw new AppError("Rating must be numeric", 400);
+    if (![1, 2, 3, 4, 5].includes(+rating)) throw new AppError("Rating must be in range");
+
+    //- Summarize
+    if (!isNotEmpty(summarize)) throw new AppError("Summarize is required", 400);
+
+    //- ReviewText
+    if (!isNotEmpty(reviewText)) throw new AppError("Review text is required", 400);
+
+    //- Authorize of user
+    const existReview = await db.ReviewPost.findOne({ where: { id: reviewId } });
+    if (existReview.userId !== user.id) throw new AppError("No authorize to update other user's comment", 403);
+
+    await existReview.update({ summarize, reviewText, rating });
+    return res.status(200).json({
+      reviewPost: {
+        id: existReview.id,
+        summarize: existReview.summarize,
+        reviewText: existReview.reviewText,
+        rating: existReview.rating
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+///+ Delete review
+exports.deleteReview = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const { reviewId } = req.params;
+
+    const reviewAllIdList = await getAllAttributes(db.ReviewPost, "id");
+
+    //+Validation
+    //- ReviewId
+    if (isNaN(reviewId)) throw new AppError("ReviewId must be numeric", 400);
+    if (!reviewAllIdList.includes(+reviewId)) throw new AppError("ReviewId not found", 400);
+
+    //- Authorize of user
+    const existReview = await db.ReviewPost.findOne({ where: { id: reviewId } });
+    if (existReview.userId !== user.id) throw new AppError("No authorize to delete other user's comment", 403);
+
+    await existReview.destroy();
+    return res.status(204).json();
   } catch (error) {
     next(error);
   }
