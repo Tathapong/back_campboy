@@ -11,7 +11,8 @@ const joincampRoute = require("./routes/joincampRoute");
 
 const errorMiddleware = require("./middlewares/errorMiddleware");
 
-// const { sequelize, JoinCamp } = require("./models/index");
+// const { sequelize } = require("./models/index");
+// sequelize.sync()
 
 const express = require("express");
 const cors = require("cors");
