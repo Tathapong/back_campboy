@@ -7,11 +7,18 @@
     "dialect": "mysql"
   },
   "test": {
-    "username": "root",
-    "password": null,
-    "database": "database_test",
-    "host": "127.0.0.1",
-    "dialect": "mysql"
+    "username": "m98rbpnxnogxkmwezz9e",
+    "password": "pscale_pw_owfYKF2Ga9Lyaw6L0KBQ7keE1f56h3g5WCEufMWEMKj",
+    "database": "campboy",
+    "host": "aws.connect.psdb.cloud",
+    "dialect": "mysql",
+    "port": "3306",
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
   },
   "production": {
     "username": "root",
