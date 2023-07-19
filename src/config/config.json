@@ -12,7 +12,6 @@
     "database": "campboy",
     "host": "aws.connect.psdb.cloud",
     "dialect": "mysql",
-    "port": "3306",
     "dialectOptions": {
       "ssl": {
         "require": true,
