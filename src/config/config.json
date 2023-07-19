@@ -14,7 +14,7 @@
     "dialect": "mysql",
     "dialectOptions": {
       "ssl": {
-        "rejectUnauthorized": false
+        "rejectUnauthorized": true
       }
     }
   },
