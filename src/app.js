@@ -1,39 +1,21 @@
-require("dotenv").config();
-
-const authRoute = require("./routes/authRoute");
-const blogRoute = require("./routes/blogRoute");
-const campRoute = require("./routes/campRoute");
-const commentRoute = require("./routes/commentRoute");
-const homeRoute = require("./routes/homeRoute");
-const infomationRoute = require("./routes/informationRoute");
-const profileRoute = require("./routes/profileRoute");
-const joincampRoute = require("./routes/joincampRoute");
-
-const errorMiddleware = require("./middlewares/errorMiddleware");
-
-// const { sequelize, User } = require("./models/index");
-// sequelize.sync()
-
 const express = require("express");
+const app = express();
 const cors = require("cors");
 
-const app = express();
+const mysql = require("mysql2");
 
 app.use(cors());
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
 
-app.use("/api/resources", infomationRoute);
+app.use("/test", async function (req, res, next) {
+  const connection = mysql.createConnection({
+    host: "aws.connect.psdb.cloud",
+    user: "fptip5ql73qe44e43l6x",
+    password: "pscale_pw_8v9DVnfXAi2Vy3JrmydKIZLeWhDuvYFXwFCi6Ud93Q2",
+    database: "campboy",
+    ssl: { rejectUnauthorized: true }
+  });
 
-app.use("/auth", authRoute);
-app.use("/blog", blogRoute);
-app.use("/camp", campRoute);
-app.use("/comment", commentRoute);
-app.use("/home", homeRoute);
-app.use("/profile", profileRoute);
-app.use("/joincamp", joincampRoute);
+  connection.query("select * from users", (err, results, fields) => console.log(results));
+});
 
-app.use(errorMiddleware);
-
-const port = process.env.PORT || 8008;
-app.listen(port, () => console.log("server running on port " + port));
+app.listen(8000, () => console.log("server is running on port 8000"));

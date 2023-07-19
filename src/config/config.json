@@ -7,14 +7,13 @@
     "dialect": "mysql"
   },
   "test": {
-    "username": "d7nmgnk9vzxwsgurwo6d",
-    "password": "pscale_pw_QdxW3tYEl3VeayQqwAUmPcBTiGMNmY6hupdo4c7vAan",
+    "username": "fptip5ql73qe44e43l6x",
+    "password": "pscale_pw_8v9DVnfXAi2Vy3JrmydKIZLeWhDuvYFXwFCi6Ud93Q2",
     "database": "campboy",
     "host": "aws.connect.psdb.cloud",
     "dialect": "mysql",
     "dialectOptions": {
       "ssl": {
-        "require": true,
         "rejectUnauthorized": false
       }
     }
