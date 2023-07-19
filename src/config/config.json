@@ -7,8 +7,8 @@
     "dialect": "mysql"
   },
   "test": {
-    "username": "m6bvv20s1ht5yps9qr26",
-    "password": "pscale_pw_bO50NEULGH7CNWfGVlxSuf4QNODXVd8jayrEwozQcVS",
+    "username": "qpqvw3kcxzg0i2fvmc8t",
+    "password": "pscale_pw_KiK30VzjGuL9YEjRXCbiaj3ZIGCzaG0mxWeeeOAgd7p",
     "database": "campboy",
     "host": "aws.connect.psdb.cloud",
     "dialect": "mysql",
