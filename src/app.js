@@ -1,21 +1,39 @@
 require("dotenv").config();
+
+const authRoute = require("./routes/authRoute");
+const blogRoute = require("./routes/blogRoute");
+const campRoute = require("./routes/campRoute");
+const commentRoute = require("./routes/commentRoute");
+const homeRoute = require("./routes/homeRoute");
+const infomationRoute = require("./routes/informationRoute");
+const profileRoute = require("./routes/profileRoute");
+const joincampRoute = require("./routes/joincampRoute");
+
+const errorMiddleware = require("./middlewares/errorMiddleware");
+
+// const { sequelize, User } = require("./models/index");
+// sequelize.sync()
+
 const express = require("express");
-const app = express();
 const cors = require("cors");
 
-const mysql = require("mysql2/promise");
+const app = express();
 
 app.use(cors());
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
 
-app.use("/test", async function (req, res, next) {
-  try {
-    const connection = await mysql.createConnection(process.env.DATABASE_URL);
+app.use("/api/resources", infomationRoute);
 
-    const [rows, fields] = await connection.execute("select * from users");
-    return res.status(200).json({ users: rows });
-  } catch (error) {
-    console.log(error);
-  }
-});
+app.use("/auth", authRoute);
+app.use("/blog", blogRoute);
+app.use("/camp", campRoute);
+app.use("/comment", commentRoute);
+app.use("/home", homeRoute);
+app.use("/profile", profileRoute);
+app.use("/joincamp", joincampRoute);
 
-app.listen(8000, () => console.log("server is running on port 8000"));
+app.use(errorMiddleware);
+
+const port = process.env.PORT || 8008;
+app.listen(port, () => console.log("server running on port " + port));
