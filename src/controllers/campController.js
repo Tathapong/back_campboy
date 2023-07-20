@@ -26,13 +26,13 @@ exports.getCampById = async (req, res, next) => {
         "locationLat",
         "locationLng",
         "overview",
-        [db.sequelize.literal("(select id from provinces where id=Camp.province_id)"), "provinceId"],
+        "provinceId",
         [db.sequelize.literal("(select name from provinces where id=Camp.province_id)"), "provinceName"],
         [db.sequelize.literal("(select round(avg(rating)) from review_posts where camp_id=Camp.id )"), "scores"]
       ],
 
       include: [
-        { model: db.CampImage, attributes: ["id", ["image", "src"]] },
+        { model: db.CampImage, attributes: ["id", ["image", "src"]], separate: true },
         { model: db.CampContact, attributes: ["id", "type", "contact"] },
         {
           model: db.CampInformation,
