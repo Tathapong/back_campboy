@@ -13,8 +13,9 @@ let sequelize;
 
 if (config.use_env_variable) {
   sequelize = new Sequelize(process.env[config.use_env_variable], config);
+} else if (env === "test") {
+  sequelize = new Sequelize(process.env.DATABASE, process.env.DATABASE_USERNAME, process.env.DATABASE_PASSWORD, config);
 } else {
-  console.log(config);
   sequelize = new Sequelize(config.database, config.username, config.password, config);
 }
 
@@ -32,8 +33,6 @@ Object.keys(db).forEach((modelName) => {
     db[modelName].associate(db);
   }
 });
-
-console.log(sequelize);
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
